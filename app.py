@@ -94,7 +94,7 @@ class Service1(Service):
     SVC_UUID = "18F0"
 
     def __init__(self, bus, index):
-        Service.__init__(self, bus, index, self.ESPRESSO_SVC_UUID, True)
+        Service.__init__(self, bus, index, self.SVC_UUID, True)
         self.add_characteristic(Char1(bus, 0, self))
         self.add_characteristic(Char2(bus, 1, self))
 
