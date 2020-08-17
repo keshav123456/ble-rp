@@ -84,149 +84,89 @@ def register_app_error_cb(error):
     mainloop.quit()
 
 
-class VivaldiS1Service(Service):
+class Service1(Service):
     """
     Dummy test service that provides characteristics and descriptors that
     exercise various API functionality.
 
     """
 
-    ESPRESSO_SVC_UUID = "12634d89-d598-4874-8e86-7d042ee07ba7"
+    SVC_UUID = "18F0"
 
     def __init__(self, bus, index):
         Service.__init__(self, bus, index, self.ESPRESSO_SVC_UUID, True)
-        self.add_characteristic(PowerControlCharacteristic(bus, 0, self))
-        self.add_characteristic(BoilerControlCharacteristic(bus, 1, self))
-        self.add_characteristic(AutoOffCharacteristic(bus, 2, self))
+        self.add_characteristic(Char1(bus, 0, self))
+        self.add_characteristic(Char2(bus, 1, self))
 
 
-class PowerControlCharacteristic(Characteristic):
-    uuid = "4116f8d2-9f66-4f58-a53d-fc7440e7c14e"
-    description = b"Get/set machine power state {'ON', 'OFF', 'UNKNOWN'}"
-
-    class State(Enum):
-        on = "ON"
-        off = "OFF"
-        unknown = "UNKNOWN"
-
-        @classmethod
-        def has_value(cls, value):
-            return value in cls._value2member_map_
-
-    power_options = {"ON", "OFF", "UNKNOWN"}
+class Char1(Characteristic):
+    uuid = "2AF0"
+    description = b"Notifyindicateservice"
 
     def __init__(self, bus, index, service):
         Characteristic.__init__(
-            self, bus, index, self.uuid, ["encrypt-read", "encrypt-write"], service,
+            self, bus, index, self.uuid, ["notify", "indicate"], service,
         )
 
-        self.value = [0xFF]
         self.add_descriptor(CharacteristicUserDescriptionDescriptor(bus, 1, self))
 
-    def ReadValue(self, options):
-        logger.debug("power Read: " + repr(self.value))
-        res = None
-        try:
-            res = requests.get(VivaldiBaseUrl + "/vivaldi")
-            self.value = bytearray(res.json()["machine"], encoding="utf8")
-        except Exception as e:
-            logger.error(f"Error getting status {e}")
-            self.value = bytearray(self.State.unknown, encoding="utf8")
-
-        return self.value
-
-    def WriteValue(self, value, options):
-        logger.debug("power Write: " + repr(value))
-        cmd = bytes(value).decode("utf-8")
-        if self.State.has_value(cmd):
-            # write it to machine
-            logger.info("writing {cmd} to machine")
-            data = {"cmd": cmd.lower()}
-            try:
-                res = requests.post(VivaldiBaseUrl + "/vivaldi/cmds", json=data)
-            except Exceptions as e:
-                logger.error(f"Error updating machine state: {e}")
-        else:
-            logger.info(f"invalid state written {cmd}")
-            raise NotPermittedException
-
-        self.value = value
-
-
-class BoilerControlCharacteristic(Characteristic):
-    uuid = "322e774f-c909-49c4-bd7b-48a4003a967f"
+class Char2(Characteristic):
+    uuid = "2AF1"
     description = b"Get/set boiler power state can be `on` or `off`"
 
     def __init__(self, bus, index, service):
         Characteristic.__init__(
-            self, bus, index, self.uuid, ["encrypt-read", "encrypt-write"], service,
+            self, bus, index, self.uuid, ["write", "write-without-response"], service,
         )
 
         self.value = []
         self.add_descriptor(CharacteristicUserDescriptionDescriptor(bus, 1, self))
 
-    def ReadValue(self, options):
-        logger.info("boiler read: " + repr(self.value))
-        res = None
-        try:
-            res = requests.get(VivaldiBaseUrl + "/vivaldi")
-            self.value = bytearray(res.json()["boiler"], encoding="utf8")
-        except Exception as e:
-            logger.error(f"Error getting status {e}")
-
-        return self.value
-
     def WriteValue(self, value, options):
-        logger.info("boiler state Write: " + repr(value))
-        cmd = bytes(value).decode("utf-8")
-
-        # write it to machine
-        logger.info("writing {cmd} to machine")
-        data = {"cmd": "setboiler", "state": cmd.lower()}
+        logger.info("Written to: " + repr(value))
         try:
-            res = requests.post(VivaldiBaseUrl + "/vivaldi/cmds", json=data)
-            logger.info(res)
+            cmd = bytes(value).decode("utf-8")
+            print(cmd)
         except Exceptions as e:
             logger.error(f"Error updating machine state: {e}")
             raise
 
+# class AutoOffCharacteristic(Characteristic):
+#     uuid = "9c7dbce8-de5f-4168-89dd-74f04f4e5842"
+#     description = b"Get/set autoff time in minutes"
 
-class AutoOffCharacteristic(Characteristic):
-    uuid = "9c7dbce8-de5f-4168-89dd-74f04f4e5842"
-    description = b"Get/set autoff time in minutes"
+#     def __init__(self, bus, index, service):
+#         Characteristic.__init__(
+#             self, bus, index, self.uuid, ["secure-read", "secure-write"], service,
+#         )
 
-    def __init__(self, bus, index, service):
-        Characteristic.__init__(
-            self, bus, index, self.uuid, ["secure-read", "secure-write"], service,
-        )
+#         self.value = []
+#         self.add_descriptor(CharacteristicUserDescriptionDescriptor(bus, 1, self))
 
-        self.value = []
-        self.add_descriptor(CharacteristicUserDescriptionDescriptor(bus, 1, self))
+#     def ReadValue(self, options):
+#         logger.info("auto off read: " + repr(self.value))
+#         res = None
+#         try:
+#             res = requests.get(VivaldiBaseUrl + "/vivaldi")
+#             self.value = bytearray(struct.pack("i", int(res.json()["autoOffMinutes"])))
+#         except Exception as e:
+#             logger.error(f"Error getting status {e}")
 
-    def ReadValue(self, options):
-        logger.info("auto off read: " + repr(self.value))
-        res = None
-        try:
-            res = requests.get(VivaldiBaseUrl + "/vivaldi")
-            self.value = bytearray(struct.pack("i", int(res.json()["autoOffMinutes"])))
-        except Exception as e:
-            logger.error(f"Error getting status {e}")
+#         return self.value
 
-        return self.value
+#     def WriteValue(self, value, options):
+#         logger.info("auto off write: " + repr(value))
+#         cmd = bytes(value)
 
-    def WriteValue(self, value, options):
-        logger.info("auto off write: " + repr(value))
-        cmd = bytes(value)
-
-        # write it to machine
-        logger.info("writing {cmd} to machine")
-        data = {"cmd": "autoOffMinutes", "time": struct.unpack("i", cmd)[0]}
-        try:
-            res = requests.post(VivaldiBaseUrl + "/vivaldi/cmds", json=data)
-            logger.info(res)
-        except Exceptions as e:
-            logger.error(f"Error updating machine state: {e}")
-            raise
+#         # write it to machine
+#         logger.info("writing {cmd} to machine")
+#         data = {"cmd": "autoOffMinutes", "time": struct.unpack("i", cmd)[0]}
+#         try:
+#             res = requests.post(VivaldiBaseUrl + "/vivaldi/cmds", json=data)
+#             logger.info(res)
+#         except Exceptions as e:
+#             logger.error(f"Error updating machine state: {e}")
+#             raise
 
 
 class CharacteristicUserDescriptionDescriptor(Descriptor):
@@ -259,7 +199,7 @@ class VivaldiAdvertisement(Advertisement):
         self.add_manufacturer_data(
             0xFFFF, [0x70, 0x74],
         )
-        self.add_service_uuid(VivaldiS1Service.ESPRESSO_SVC_UUID)
+        self.add_service_uuid(Service1.SVC_UUID)
 
         self.add_local_name("Vivaldi")
         self.include_tx_power = True
@@ -308,7 +248,7 @@ def main():
     agent = Agent(bus, AGENT_PATH)
 
     app = Application(bus)
-    app.add_service(VivaldiS1Service(bus, 2))
+    app.add_service(Service1(bus, 2))
 
     mainloop = MainLoop()
 
